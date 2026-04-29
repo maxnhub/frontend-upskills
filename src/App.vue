@@ -1,14 +1,29 @@
 <script setup>
+import { ref } from 'vue';
 import AppHeader from './components/AppHeader.vue';
 import LessonView from './components/LessonView.vue';
+import AuthModal from './components/AuthModal.vue';
+import ProfilePage from './components/ProfilePage.vue';
+import { useAuthStore } from './stores/auth.js';
+
+const authStore = useAuthStore();
+const currentView = ref('main');
+
+function navigate(view) {
+  currentView.value = view;
+}
 </script>
 
 <template>
   <div class="app">
-    <AppHeader />
-    <main>
-      <LessonView />
-    </main>
+    <AuthModal v-if="!authStore.isAuthenticated" />
+    <template v-else>
+      <AppHeader @navigate="navigate" />
+      <main>
+        <ProfilePage v-if="currentView === 'profile'" @navigate="navigate" />
+        <LessonView v-else />
+      </main>
+    </template>
   </div>
 </template>
 

@@ -506,6 +506,721 @@ user.age = 200;     // TypeError!</code></pre>
       },
     ],
   },
+  {
+    id: 2,
+    title: 'Типизация и TypeScript Advanced',
+    Lessons: [
+      {
+        id: 7,
+        title: 'Utility Types: Partial, Pick, Omit, Exclude и другие',
+        content: `
+          <h3>Что такое Utility Types?</h3>
+          <p>TypeScript поставляется с набором встроенных утилитарных типов, которые позволяют трансформировать существующие типы. Они реализованы через маппинг и условные типы прямо в стандартной библиотеке.</p>
+
+          <h3>Partial&lt;T&gt; — все поля необязательны</h3>
+          <pre><code>interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+type PartialUser = Partial&lt;User&gt;;
+// { id?: number; name?: string; email?: string }
+
+// Применение: обновление части объекта
+const updateUser = (user: User, patch: Partial&lt;User&gt;): User => ({
+  ...user,
+  ...patch,
+});</code></pre>
+
+          <h3>Required&lt;T&gt; — все поля обязательны</h3>
+          <pre><code>interface Config {
+  host?: string;
+  port?: number;
+}
+
+type StrictConfig = Required&lt;Config&gt;;
+// { host: string; port: number }</code></pre>
+
+          <h3>Pick&lt;T, K&gt; — выбрать поля</h3>
+          <pre><code>type UserPreview = Pick&lt;User, 'id' | 'name'&gt;;
+// { id: number; name: string }
+
+// Полезно для DTO и API-ответов</code></pre>
+
+          <h3>Omit&lt;T, K&gt; — исключить поля</h3>
+          <pre><code>type UserWithoutId = Omit&lt;User, 'id'&gt;;
+// { name: string; email: string }
+
+// Создание нового пользователя (без id — его генерирует БД)
+const createUser = (data: Omit&lt;User, 'id'&gt;): User => ({
+  id: Math.random(),
+  ...data,
+});</code></pre>
+
+          <h3>Exclude&lt;T, U&gt; и Extract&lt;T, U&gt;</h3>
+          <pre><code>type Status = 'loading' | 'success' | 'error' | 'idle';
+
+type ActiveStatus = Exclude&lt;Status, 'idle'&gt;;
+// 'loading' | 'success' | 'error'
+
+type ErrorStatus = Extract&lt;Status, 'error' | 'idle'&gt;;
+// 'error' | 'idle'</code></pre>
+
+          <h3>Record&lt;K, V&gt;, NonNullable&lt;T&gt;, ReturnType&lt;T&gt;</h3>
+          <pre><code>// Record — создать объект с заданными ключами и типом значений
+type StatusMap = Record&lt;Status, string&gt;;
+// { loading: string; success: string; error: string; idle: string }
+
+// NonNullable — убрать null и undefined
+type Defined = NonNullable&lt;string | null | undefined&gt;; // string
+
+// ReturnType — тип возвращаемого значения функции
+const fetchUser = async (): Promise&lt;User&gt; => ({ id: 1, name: 'Иван', email: 'i@i.com' });
+type FetchResult = ReturnType&lt;typeof fetchUser&gt;; // Promise&lt;User&gt;</code></pre>
+
+          <div class="note">
+            <p><strong>Совет:</strong> Utility Types не требуют дополнительных импортов — они доступны глобально в любом TypeScript проекте.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Есть интерфейс Product. Создайте три типа: ProductPreview (только id и title), ProductUpdate (все поля необязательны, без id), ProductStatus (только статус из заданного union-типа, без null).',
+          initialCode: `interface Product {
+  id: number;
+  title: string;
+  price: number;
+  stock: number;
+  status: 'active' | 'draft' | null;
+}
+
+// Ваш код:
+type ProductPreview = // только id и title
+
+type ProductUpdate = // все поля необязательны, без id
+
+type ProductStatus = // только ненулевой статус`,
+          solution: `interface Product {
+  id: number;
+  title: string;
+  price: number;
+  stock: number;
+  status: 'active' | 'draft' | null;
+}
+
+type ProductPreview = Pick<Product, 'id' | 'title'>;
+
+type ProductUpdate = Partial<Omit<Product, 'id'>>;
+
+type ProductStatus = NonNullable<Product['status']>;`,
+          hint: 'Используйте Pick для выбора полей, Omit для исключения id, Partial для необязательных полей, NonNullable для удаления null.',
+        },
+      },
+      {
+        id: 8,
+        title: 'Условные типы: extends ? : и дистрибутивность',
+        content: `
+          <h3>Синтаксис условного типа</h3>
+          <p>Условные типы позволяют выбирать тип на основе условия — аналог тернарного оператора для типов:</p>
+          <pre><code>type IsString&lt;T&gt; = T extends string ? 'да' : 'нет';
+
+type A = IsString&lt;string&gt;;  // 'да'
+type B = IsString&lt;number&gt;;  // 'нет'</code></pre>
+
+          <h3>Дистрибутивность</h3>
+          <p>Когда условный тип применяется к union-типу через обобщённый параметр, он <strong>распределяется</strong> по каждому члену union:</p>
+          <pre><code>type ToArray&lt;T&gt; = T extends any ? T[] : never;
+
+type Result = ToArray&lt;string | number&gt;;
+// string[] | number[]  ← дистрибутивность!
+
+// Чтобы отключить дистрибутивность — оберните в кортеж:
+type ToArrayNonDist&lt;T&gt; = [T] extends [any] ? T[] : never;
+type Result2 = ToArrayNonDist&lt;string | number&gt;;
+// (string | number)[]</code></pre>
+
+          <h3>Практические паттерны</h3>
+          <pre><code>// Получить все ключи, значение которых — строка
+type StringKeys&lt;T&gt; = {
+  [K in keyof T]: T[K] extends string ? K : never;
+}[keyof T];
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  age: number;
+}
+
+type UserStringKeys = StringKeys&lt;User&gt;; // 'name' | 'email'</code></pre>
+
+          <pre><code>// Flatten — убрать один уровень массива
+type Flatten&lt;T&gt; = T extends Array&lt;infer Item&gt; ? Item : T;
+
+type A = Flatten&lt;string[]&gt;;   // string
+type B = Flatten&lt;number[][]&gt;; // number[]
+type C = Flatten&lt;boolean&gt;;    // boolean</code></pre>
+
+          <h3>never в условных типах</h3>
+          <p><code>never</code> при использовании в union исчезает, что делает его отличным инструментом для фильтрации:</p>
+          <pre><code>// Исключить из union все типы, не являющиеся функциями
+type FunctionKeys&lt;T&gt; = {
+  [K in keyof T]: T[K] extends Function ? K : never;
+}[keyof T];
+
+class Api {
+  baseUrl: string = '';
+  fetchUser(id: number) {}
+  postData(data: unknown) {}
+}
+
+type ApiMethods = FunctionKeys&lt;Api&gt;; // 'fetchUser' | 'postData'</code></pre>
+
+          <div class="note">
+            <p><strong>Важно:</strong> Условные типы вычисляются лениво. TypeScript может оставить тип в "невычисленном" виде, если параметр T ещё не известен.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Напишите тип DeepReadonly&lt;T&gt;, который рекурсивно делает все поля объекта readonly. Для примитивов — оставить как есть.',
+          initialCode: `type DeepReadonly<T> = // Ваш код
+
+// Проверка:
+interface Config {
+  host: string;
+  db: {
+    port: number;
+    name: string;
+  };
+}
+
+type ReadonlyConfig = DeepReadonly<Config>;
+// Должно быть: readonly host, readonly db, readonly db.port, readonly db.name`,
+          solution: `type DeepReadonly<T> = T extends object
+  ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+  : T;`,
+          hint: 'Используйте условный тип: если T extends object — применить readonly к каждому ключу рекурсивно, иначе вернуть T.',
+        },
+      },
+      {
+        id: 9,
+        title: 'infer: выведение типов внутри условных типов',
+        content: `
+          <h3>Что такое infer?</h3>
+          <p><code>infer</code> используется только внутри условных типов (в ветке <code>extends</code>). Он позволяет "захватить" часть типа в переменную для использования в результирующем типе.</p>
+
+          <pre><code>// Без infer — мы не можем извлечь тип элемента массива
+type ElementType&lt;T&gt; = T extends Array&lt;infer Item&gt; ? Item : never;
+
+type A = ElementType&lt;string[]&gt;;  // string
+type B = ElementType&lt;number[][]&gt;; // number[]
+type C = ElementType&lt;boolean&gt;;   // never</code></pre>
+
+          <h3>infer для функций</h3>
+          <pre><code>// Тип первого аргумента функции
+type FirstArg&lt;T&gt; = T extends (first: infer F, ...args: any[]) => any ? F : never;
+
+const greet = (name: string, age: number) => {};
+type Name = FirstArg&lt;typeof greet&gt;; // string
+
+// Тип возвращаемого значения (аналог ReturnType)
+type MyReturnType&lt;T&gt; = T extends (...args: any[]) => infer R ? R : never;
+
+const add = (a: number, b: number): number => a + b;
+type Result = MyReturnType&lt;typeof add&gt;; // number</code></pre>
+
+          <h3>infer для промисов</h3>
+          <pre><code>// Распаковать Promise
+type Awaited&lt;T&gt; = T extends Promise&lt;infer R&gt; ? Awaited&lt;R&gt; : T;
+// (встроен в TS 4.5+ как Awaited&lt;T&gt;)
+
+type A = Awaited&lt;Promise&lt;string&gt;&gt;;           // string
+type B = Awaited&lt;Promise&lt;Promise&lt;number&gt;&gt;&gt;;   // number</code></pre>
+
+          <h3>infer для кортежей и объектов</h3>
+          <pre><code>// Последний элемент кортежа
+type Last&lt;T extends any[]&gt; = T extends [...infer _, infer L] ? L : never;
+
+type A = Last&lt;[1, 2, 3]&gt;;       // 3
+type B = Last&lt;[string, number]&gt;; // number
+
+// Тип значений объекта (аналог Record)
+type ValueOf&lt;T&gt; = T extends { [key: string]: infer V } ? V : never;
+
+type Vals = ValueOf&lt;{ a: string; b: number }&gt;; // string | number</code></pre>
+
+          <h3>Несколько infer в одном условии</h3>
+          <pre><code>// Разделить кортеж на голову и хвост
+type Head&lt;T extends any[]&gt; = T extends [infer H, ...any[]] ? H : never;
+type Tail&lt;T extends any[]&gt; = T extends [any, ...infer T] ? T : never;
+
+type H = Head&lt;[1, 2, 3]&gt;; // 1
+type T = Tail&lt;[1, 2, 3]&gt;; // [2, 3]</code></pre>
+
+          <div class="note">
+            <p><strong>Запомните:</strong> <code>infer</code> можно использовать только в правой части <code>extends</code> внутри условного типа. Снаружи условия он недоступен.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Напишите тип Parameters&lt;T&gt; (аналог встроенного), который возвращает кортеж типов параметров функции.',
+          initialCode: `type MyParameters<T> = // Ваш код
+
+// Проверка:
+const createUser = (name: string, age: number, admin: boolean) => {};
+
+type Params = MyParameters<typeof createUser>;
+// Ожидается: [name: string, age: number, admin: boolean]`,
+          solution: `type MyParameters<T> = T extends (...args: infer P) => any ? P : never;`,
+          hint: 'Используйте infer P в позиции аргументов функции: T extends (...args: infer P) => any ? P : never',
+        },
+      },
+      {
+        id: 10,
+        title: 'Маппинг типов (Mapped Types)',
+        content: `
+          <h3>Что такое Mapped Types?</h3>
+          <p>Маппинг типов позволяет создавать новые типы, итерируя по ключам существующего типа. Синтаксис: <code>{ [K in keyof T]: ... }</code>.</p>
+
+          <pre><code>// Ручная реализация Readonly
+type MyReadonly&lt;T&gt; = {
+  readonly [K in keyof T]: T[K];
+};
+
+// Ручная реализация Partial
+type MyPartial&lt;T&gt; = {
+  [K in keyof T]?: T[K];
+};
+
+// Снять readonly (+/- модификаторы)
+type Mutable&lt;T&gt; = {
+  -readonly [K in keyof T]: T[K];
+};
+
+// Сделать все поля обязательными
+type MyRequired&lt;T&gt; = {
+  [K in keyof T]-?: T[K];
+};</code></pre>
+
+          <h3>Переименование ключей через as</h3>
+          <pre><code>// Добавить префикс get к каждому ключу
+type Getters&lt;T&gt; = {
+  [K in keyof T as \`get\${Capitalize&lt;string & K&gt;}\`]: () => T[K];
+};
+
+interface User {
+  name: string;
+  age: number;
+}
+
+type UserGetters = Getters&lt;User&gt;;
+// { getName: () => string; getAge: () => number }</code></pre>
+
+          <h3>Фильтрация ключей через as + never</h3>
+          <pre><code>// Оставить только ключи с определённым типом значения
+type PickByValue&lt;T, V&gt; = {
+  [K in keyof T as T[K] extends V ? K : never]: T[K];
+};
+
+interface Form {
+  name: string;
+  age: number;
+  email: string;
+  isAdmin: boolean;
+}
+
+type StringFields = PickByValue&lt;Form, string&gt;;
+// { name: string; email: string }</code></pre>
+
+          <h3>Вложенный маппинг</h3>
+          <pre><code>// Рекурсивно сделать все поля необязательными
+type DeepPartial&lt;T&gt; = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial&lt;T[K]&gt; : T[K];
+};
+
+interface Config {
+  server: { host: string; port: number };
+  db: { name: string; user: string };
+}
+
+type PartialConfig = DeepPartial&lt;Config&gt;;
+// server?: { host?: string; port?: number }</code></pre>
+
+          <h3>Mapped Types + Template Literal Types</h3>
+          <pre><code>type EventMap&lt;T extends string&gt; = {
+  [K in T as \`on\${Capitalize&lt;K&gt;}\`]: (event: K) => void;
+};
+
+type ButtonEvents = EventMap&lt;'click' | 'focus' | 'blur'&gt;;
+// { onClick: ...; onFocus: ...; onBlur: ... }</code></pre>
+
+          <div class="note">
+            <p><strong>Ключевое правило:</strong> Модификатор <code>as</code> применяется после <code>in keyof T</code>. Если <code>as</code> возвращает <code>never</code>, ключ исключается из результата.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Напишите тип Nullable&lt;T&gt;, который делает все поля объекта допускающими null. Затем напишите тип OmitNever&lt;T&gt;, который убирает из объекта все поля с типом never.',
+          initialCode: `// Сделать все поля допускающими null
+type Nullable<T> = // Ваш код
+
+// Убрать поля с типом never
+type OmitNever<T> = // Ваш код
+
+// Проверка:
+interface User { id: number; name: string; }
+type NullableUser = Nullable<User>;
+// { id: number | null; name: string | null }
+
+type WithNever = { a: string; b: never; c: number };
+type Clean = OmitNever<WithNever>;
+// { a: string; c: number }`,
+          solution: `type Nullable<T> = {
+  [K in keyof T]: T[K] | null;
+};
+
+type OmitNever<T> = {
+  [K in keyof T as T[K] extends never ? never : K]: T[K];
+};`,
+          hint: 'Для Nullable добавьте | null к T[K]. Для OmitNever используйте as с условием: если T[K] extends never — возвращайте never (ключ исчезнет), иначе K.',
+        },
+      },
+      {
+        id: 11,
+        title: 'Перегрузка функций (Function Overloads)',
+        content: `
+          <h3>Зачем нужна перегрузка?</h3>
+          <p>Перегрузка позволяет описать несколько сигнатур для одной функции — TypeScript выберет подходящую на основе переданных аргументов. Это даёт точную типизацию при разных вариантах вызова.</p>
+
+          <h3>Синтаксис перегрузки</h3>
+          <pre><code>// Сигнатуры перегрузки (только типы, без реализации)
+function format(value: string): string;
+function format(value: number, decimals: number): string;
+function format(value: Date): string;
+
+// Реализация (не экспортируется как отдельная сигнатура)
+function format(value: string | number | Date, decimals?: number): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return value.toFixed(decimals ?? 2);
+  return value.toLocaleDateString('ru-RU');
+}
+
+format('  hello  ');   // string ✓
+format(3.14159, 2);    // string ✓
+format(new Date());    // string ✓
+// format(true);       // Ошибка ✓</code></pre>
+
+          <h3>Перегрузка с разными типами возврата</h3>
+          <pre><code>function createElement(tag: 'a'): HTMLAnchorElement;
+function createElement(tag: 'canvas'): HTMLCanvasElement;
+function createElement(tag: 'input'): HTMLInputElement;
+function createElement(tag: string): HTMLElement;
+function createElement(tag: string): HTMLElement {
+  return document.createElement(tag);
+}
+
+const link = createElement('a');
+// TypeScript знает, что link — HTMLAnchorElement
+link.href = 'https://example.com'; // ✓</code></pre>
+
+          <h3>Перегрузка методов класса</h3>
+          <pre><code>class EventEmitter {
+  on(event: 'data', listener: (data: string) => void): this;
+  on(event: 'error', listener: (error: Error) => void): this;
+  on(event: 'close', listener: () => void): this;
+  on(event: string, listener: (...args: any[]) => void): this {
+    // реализация
+    return this;
+  }
+}</code></pre>
+
+          <h3>Альтернатива: условные типы</h3>
+          <p>Иногда вместо перегрузки можно использовать дженерик с условным типом — это более гибко:</p>
+          <pre><code>type ParseResult&lt;T extends string | number&gt; =
+  T extends string ? number : string;
+
+function parse&lt;T extends string | number&gt;(value: T): ParseResult&lt;T&gt; {
+  if (typeof value === 'string') return Number(value) as ParseResult&lt;T&gt;;
+  return String(value) as ParseResult&lt;T&gt;;
+}
+
+const num = parse('42');  // number
+const str = parse(42);    // string</code></pre>
+
+          <div class="note">
+            <p><strong>Правило:</strong> Сигнатуры перегрузки идут до реализации. Реализация должна быть совместима со всеми сигнатурами. TypeScript показывает только сигнатуры перегрузок в подсказках — реализацию скрывает.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Напишите перегруженную функцию toArray, которая: при передаче строки — возвращает string[], при передаче числа — возвращает number[], при передаче boolean — возвращает boolean[].',
+          initialCode: `// Объявите сигнатуры перегрузки и реализацию:
+function toArray(value: string): string[];
+// ... остальные сигнатуры
+
+function toArray(value: any): any[] {
+  // Ваша реализация
+}
+
+// Проверка:
+const a = toArray('hello'); // string[]
+const b = toArray(42);      // number[]
+const c = toArray(true);    // boolean[]`,
+          solution: `function toArray(value: string): string[];
+function toArray(value: number): number[];
+function toArray(value: boolean): boolean[];
+function toArray(value: string | number | boolean): (string | number | boolean)[] {
+  return [value];
+}`,
+          hint: 'Напишите три сигнатуры перегрузки, затем одну реализацию с union-типом параметра. Реализация принимает все возможные типы.',
+        },
+      },
+      {
+        id: 12,
+        title: 'Дженерики в React-компонентах с TypeScript',
+        content: `
+          <h3>Зачем дженерики в компонентах?</h3>
+          <p>Дженерик-компоненты позволяют создавать переиспользуемые UI-компоненты, которые сохраняют информацию о типах данных, с которыми работают.</p>
+
+          <h3>Дженерик-компонент: базовый пример</h3>
+          <pre><code>interface ListProps&lt;T&gt; {
+  items: T[];
+  renderItem: (item: T) => React.ReactNode;
+  keyExtractor: (item: T) => string;
+}
+
+function List&lt;T&gt;({ items, renderItem, keyExtractor }: ListProps&lt;T&gt;) {
+  return (
+    &lt;ul&gt;
+      {items.map((item) => (
+        &lt;li key={keyExtractor(item)}&gt;{renderItem(item)}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+// Использование — TypeScript выводит T автоматически:
+&lt;List
+  items={[{ id: 1, name: 'Иван' }]}
+  keyExtractor={(u) => String(u.id)}  // u: { id: number; name: string }
+  renderItem={(u) => &lt;span&gt;{u.name}&lt;/span&gt;}
+/&gt;</code></pre>
+
+          <h3>Дженерик Select с типизированным onChange</h3>
+          <pre><code>interface SelectProps&lt;T&gt; {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}
+
+function Select&lt;T extends string | number&gt;({
+  options,
+  value,
+  onChange,
+}: SelectProps&lt;T&gt;) {
+  return (
+    &lt;select
+      value={String(value)}
+      onChange={(e) => onChange(e.target.value as T)}
+    &gt;
+      {options.map((opt) => (
+        &lt;option key={String(opt.value)} value={String(opt.value)}&gt;
+          {opt.label}
+        &lt;/option&gt;
+      ))}
+    &lt;/select&gt;
+  );
+}</code></pre>
+
+          <h3>useLocalStorage — дженерик-хук</h3>
+          <pre><code>function useLocalStorage&lt;T&gt;(key: string, initialValue: T) {
+  const [value, setValue] = React.useState&lt;T&gt;(() => {
+    const stored = localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as T) : initialValue;
+  });
+
+  const set = (newValue: T) => {
+    setValue(newValue);
+    localStorage.setItem(key, JSON.stringify(newValue));
+  };
+
+  return [value, set] as const;
+}
+
+// Использование:
+const [user, setUser] = useLocalStorage&lt;User&gt;('user', defaultUser);
+// user: User, setUser: (v: User) => void</code></pre>
+
+          <h3>Дженерик с ограничением (constraint)</h3>
+          <pre><code>interface WithId {
+  id: number;
+}
+
+function DataTable&lt;T extends WithId&gt;({ rows }: { rows: T[] }) {
+  return (
+    &lt;table&gt;
+      {rows.map((row) => (
+        &lt;tr key={row.id}&gt;
+          {/* TypeScript знает, что row.id существует */}
+        &lt;/tr&gt;
+      ))}
+    &lt;/table&gt;
+  );
+}</code></pre>
+
+          <div class="note">
+            <p><strong>Синтаксис в .tsx файлах:</strong> Пишите <code>&lt;T,&gt;</code> или <code>&lt;T extends unknown&gt;</code> вместо <code>&lt;T&gt;</code> — иначе парсер воспринимает угловые скобки как JSX-тег.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Напишите дженерик-хук useFetch&lt;T&gt;, который принимает URL, делает fetch-запрос и возвращает объект { data: T | null, loading: boolean, error: string | null }.',
+          initialCode: `import { useState, useEffect } from 'react';
+
+function useFetch<T>(url: string) {
+  // Ваш код здесь
+}
+
+// Проверка:
+interface Post { id: number; title: string; }
+
+const { data, loading, error } = useFetch<Post>('/api/posts/1');
+// data: Post | null
+// loading: boolean
+// error: string | null`,
+          solution: `import { useState, useEffect } from 'react';
+
+function useFetch<T>(url: string) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+        return res.json() as Promise<T>;
+      })
+      .then((json) => { setData(json); setError(null); })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [url]);
+
+  return { data, loading, error };
+}`,
+          hint: 'Используйте useState<T | null>(null) для data, useState(true) для loading, useState<string | null>(null) для error. В useEffect делайте fetch и обновляйте состояние.',
+        },
+      },
+      {
+        id: 13,
+        title: 'Branded Types: номинальная типизация в TypeScript',
+        content: `
+          <h3>Проблема структурной типизации</h3>
+          <p>TypeScript использует структурную типизацию — два типа совместимы, если их структуры совпадают. Это создаёт проблемы с семантически разными, но структурно одинаковыми типами:</p>
+          <pre><code>type UserId = number;
+type OrderId = number;
+
+const getUserById = (id: UserId) => { /* ... */ };
+const orderId: OrderId = 42;
+
+getUserById(orderId); // TypeScript не выдаст ошибку!
+// Но семантически это неверно</code></pre>
+
+          <h3>Решение: Branded Types</h3>
+          <p>Branded (nominal) типы добавляют "метку" к примитивному типу через пересечение с уникальным символом:</p>
+          <pre><code>type Brand&lt;T, B&gt; = T & { readonly __brand: B };
+
+type UserId  = Brand&lt;number, 'UserId'&gt;;
+type OrderId = Brand&lt;number, 'OrderId'&gt;;
+
+// Конструкторы (только здесь мы "создаём" branded-значение)
+const UserId  = (id: number): UserId  => id as UserId;
+const OrderId = (id: number): OrderId => id as OrderId;
+
+const getUserById = (id: UserId) => { /* ... */ };
+
+const userId  = UserId(1);
+const orderId = OrderId(42);
+
+getUserById(userId);   // ✓
+getUserById(orderId);  // Ошибка: OrderId ≠ UserId ✓
+getUserById(42);       // Ошибка: number ≠ UserId ✓</code></pre>
+
+          <h3>Строковые Branded Types</h3>
+          <pre><code>type Email = Brand&lt;string, 'Email'&gt;;
+type Url   = Brand&lt;string, 'Url'&gt;;
+
+const toEmail = (value: string): Email => {
+  if (!value.includes('@')) throw new Error('Невалидный email');
+  return value as Email;
+};
+
+const sendEmail = (to: Email, subject: string) => { /* ... */ };
+
+sendEmail(toEmail('user@example.com'), 'Тема'); // ✓
+sendEmail('user@example.com', 'Тема');          // Ошибка ✓</code></pre>
+
+          <h3>Опaque Types через unique symbol</h3>
+          <pre><code>declare const __brand: unique symbol;
+type Brand&lt;T, B&gt; = T & { readonly [__brand]: B };
+
+// unique symbol гарантирует уникальность метки
+// даже если имена совпадают в разных модулях</code></pre>
+
+          <h3>Применение: валидированные данные</h3>
+          <pre><code>type PositiveNumber = Brand&lt;number, 'PositiveNumber'&gt;;
+type Percentage    = Brand&lt;number, 'Percentage'&gt;;
+
+const toPositive = (n: number): PositiveNumber => {
+  if (n &lt;= 0) throw new Error('Должно быть положительным');
+  return n as PositiveNumber;
+};
+
+const toPercent = (n: number): Percentage => {
+  if (n &lt; 0 || n &gt; 100) throw new Error('0–100');
+  return n as Percentage;
+};
+
+const applyDiscount = (price: PositiveNumber, discount: Percentage): number =>
+  price * (1 - discount / 100);
+
+applyDiscount(toPositive(1000), toPercent(20)); // ✓
+applyDiscount(1000, 20); // Ошибка: number ≠ PositiveNumber ✓</code></pre>
+
+          <div class="note">
+            <p><strong>Соглашение:</strong> Значения с brand нельзя создавать напрямую через <code>as</code> в бизнес-коде. Только через валидирующие конструкторы — это и есть суть номинальной типизации: доверять можно только "освящённым" значениям.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Создайте Branded тип Celsius и Fahrenheit для температуры. Напишите функцию конвертации toCelsius(f: Fahrenheit): Celsius. Убедитесь, что TypeScript не позволяет перепутать единицы.',
+          initialCode: `type Brand<T, B> = T & { readonly __brand: B };
+
+// Создайте типы:
+type Celsius = // ...
+type Fahrenheit = // ...
+
+// Конструкторы:
+const Celsius = (value: number): Celsius => // ...
+const Fahrenheit = (value: number): Fahrenheit => // ...
+
+// Конвертация:
+const toCelsius = (f: Fahrenheit): Celsius => // ...
+
+// Проверка:
+const bodyTemp = Fahrenheit(98.6);
+const inCelsius = toCelsius(bodyTemp); // ✓
+// toCelsius(36.6);      // Должна быть ошибка
+// toCelsius(Celsius(37)); // Должна быть ошибка`,
+          solution: `type Brand<T, B> = T & { readonly __brand: B };
+
+type Celsius = Brand<number, 'Celsius'>;
+type Fahrenheit = Brand<number, 'Fahrenheit'>;
+
+const Celsius = (value: number): Celsius => value as Celsius;
+const Fahrenheit = (value: number): Fahrenheit => value as Fahrenheit;
+
+const toCelsius = (f: Fahrenheit): Celsius =>
+  Celsius((f - 32) * 5 / 9);`,
+          hint: 'Используйте type Brand<T, B> = T & { readonly __brand: B }. Конструкторы приводят число к branded-типу через as. Функция toCelsius принимает только Fahrenheit и возвращает Celsius.',
+        },
+      },
+    ],
+  },
 ];
 
 module.exports = chaptersData;

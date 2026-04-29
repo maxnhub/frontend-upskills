@@ -506,6 +506,613 @@ user.age = 200;     // TypeError!</code></pre>
       },
     ],
   },
+  {
+    id: 2,
+    title: 'TypeScript Advanced: Types & Patterns',
+    Lessons: [
+      {
+        id: 7,
+        title: 'Utility Types: Partial, Pick, Omit, Exclude and more',
+        content: `
+          <h3>What are Utility Types?</h3>
+          <p>TypeScript ships with a set of built-in utility types that allow you to transform existing types. They are implemented using mapped and conditional types in the standard library.</p>
+
+          <h3>Partial&lt;T&gt; — all fields optional</h3>
+          <pre><code>interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+type PartialUser = Partial&lt;User&gt;;
+// { id?: number; name?: string; email?: string }
+
+const updateUser = (user: User, patch: Partial&lt;User&gt;): User => ({
+  ...user,
+  ...patch,
+});</code></pre>
+
+          <h3>Pick&lt;T, K&gt; — select fields</h3>
+          <pre><code>type UserPreview = Pick&lt;User, 'id' | 'name'&gt;;
+// { id: number; name: string }</code></pre>
+
+          <h3>Omit&lt;T, K&gt; — exclude fields</h3>
+          <pre><code>type UserWithoutId = Omit&lt;User, 'id'&gt;;
+// { name: string; email: string }
+
+const createUser = (data: Omit&lt;User, 'id'&gt;): User => ({
+  id: Math.random(),
+  ...data,
+});</code></pre>
+
+          <h3>Exclude&lt;T, U&gt; and Extract&lt;T, U&gt;</h3>
+          <pre><code>type Status = 'loading' | 'success' | 'error' | 'idle';
+
+type ActiveStatus = Exclude&lt;Status, 'idle'&gt;;
+// 'loading' | 'success' | 'error'
+
+type ErrorStatus = Extract&lt;Status, 'error' | 'idle'&gt;;
+// 'error' | 'idle'</code></pre>
+
+          <h3>Record, NonNullable, ReturnType</h3>
+          <pre><code>type StatusMap = Record&lt;Status, string&gt;;
+
+type Defined = NonNullable&lt;string | null | undefined&gt;; // string
+
+const fetchUser = async (): Promise&lt;User&gt; => ({ id: 1, name: 'John', email: 'j@j.com' });
+type FetchResult = ReturnType&lt;typeof fetchUser&gt;; // Promise&lt;User&gt;</code></pre>
+
+          <div class="note">
+            <p><strong>Tip:</strong> Utility Types need no extra imports — they are available globally in any TypeScript project.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Given a Product interface, create three types: ProductPreview (only id and title), ProductUpdate (all fields optional, without id), ProductStatus (only the non-null status).',
+          initialCode: `interface Product {
+  id: number;
+  title: string;
+  price: number;
+  stock: number;
+  status: 'active' | 'draft' | null;
+}
+
+// Your code:
+type ProductPreview = // id and title only
+
+type ProductUpdate = // all optional, no id
+
+type ProductStatus = // non-null status only`,
+          solution: `interface Product {
+  id: number;
+  title: string;
+  price: number;
+  stock: number;
+  status: 'active' | 'draft' | null;
+}
+
+type ProductPreview = Pick<Product, 'id' | 'title'>;
+
+type ProductUpdate = Partial<Omit<Product, 'id'>>;
+
+type ProductStatus = NonNullable<Product['status']>;`,
+          hint: 'Use Pick to select fields, Omit to exclude id, Partial for optional fields, NonNullable to remove null.',
+        },
+      },
+      {
+        id: 8,
+        title: 'Conditional Types: extends ? : and distributivity',
+        content: `
+          <h3>Conditional Type Syntax</h3>
+          <p>Conditional types select a type based on a condition — the ternary operator for types:</p>
+          <pre><code>type IsString&lt;T&gt; = T extends string ? 'yes' : 'no';
+
+type A = IsString&lt;string&gt;;  // 'yes'
+type B = IsString&lt;number&gt;;  // 'no'</code></pre>
+
+          <h3>Distributivity</h3>
+          <p>When a conditional type is applied to a union type via a generic parameter, it <strong>distributes</strong> over each member:</p>
+          <pre><code>type ToArray&lt;T&gt; = T extends any ? T[] : never;
+
+type Result = ToArray&lt;string | number&gt;;
+// string[] | number[]  ← distributive!
+
+// To disable distributivity — wrap in a tuple:
+type ToArrayNonDist&lt;T&gt; = [T] extends [any] ? T[] : never;
+type Result2 = ToArrayNonDist&lt;string | number&gt;;
+// (string | number)[]</code></pre>
+
+          <h3>Practical patterns</h3>
+          <pre><code>// Get all keys whose value is a string
+type StringKeys&lt;T&gt; = {
+  [K in keyof T]: T[K] extends string ? K : never;
+}[keyof T];
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  age: number;
+}
+
+type UserStringKeys = StringKeys&lt;User&gt;; // 'name' | 'email'</code></pre>
+
+          <h3>never in conditional types</h3>
+          <p><code>never</code> disappears when used in a union, making it perfect for filtering:</p>
+          <pre><code>type FunctionKeys&lt;T&gt; = {
+  [K in keyof T]: T[K] extends Function ? K : never;
+}[keyof T];
+
+class Api {
+  baseUrl: string = '';
+  fetchUser(id: number) {}
+  postData(data: unknown) {}
+}
+
+type ApiMethods = FunctionKeys&lt;Api&gt;; // 'fetchUser' | 'postData'</code></pre>
+
+          <div class="note">
+            <p><strong>Important:</strong> Conditional types are evaluated lazily. TypeScript may leave the type in an "unevaluated" state if the T parameter is not yet known.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Write a type DeepReadonly&lt;T&gt; that recursively makes all object fields readonly. Primitives should be returned as-is.',
+          initialCode: `type DeepReadonly<T> = // Your code
+
+// Check:
+interface Config {
+  host: string;
+  db: {
+    port: number;
+    name: string;
+  };
+}
+
+type ReadonlyConfig = DeepReadonly<Config>;
+// Expected: readonly host, readonly db, readonly db.port, readonly db.name`,
+          solution: `type DeepReadonly<T> = T extends object
+  ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+  : T;`,
+          hint: 'Use a conditional type: if T extends object — apply readonly to each key recursively, otherwise return T.',
+        },
+      },
+      {
+        id: 9,
+        title: 'infer: type inference in conditional types',
+        content: `
+          <h3>What is infer?</h3>
+          <p><code>infer</code> is used only inside conditional types (in the <code>extends</code> branch). It lets you "capture" part of a type into a variable for use in the result type.</p>
+
+          <pre><code>type ElementType&lt;T&gt; = T extends Array&lt;infer Item&gt; ? Item : never;
+
+type A = ElementType&lt;string[]&gt;;   // string
+type B = ElementType&lt;number[][]&gt;;  // number[]
+type C = ElementType&lt;boolean&gt;;    // never</code></pre>
+
+          <h3>infer for functions</h3>
+          <pre><code>type FirstArg&lt;T&gt; = T extends (first: infer F, ...args: any[]) => any ? F : never;
+
+const greet = (name: string, age: number) => {};
+type Name = FirstArg&lt;typeof greet&gt;; // string
+
+type MyReturnType&lt;T&gt; = T extends (...args: any[]) => infer R ? R : never;
+
+const add = (a: number, b: number): number => a + b;
+type Result = MyReturnType&lt;typeof add&gt;; // number</code></pre>
+
+          <h3>infer for Promises</h3>
+          <pre><code>type Awaited&lt;T&gt; = T extends Promise&lt;infer R&gt; ? Awaited&lt;R&gt; : T;
+
+type A = Awaited&lt;Promise&lt;string&gt;&gt;;           // string
+type B = Awaited&lt;Promise&lt;Promise&lt;number&gt;&gt;&gt;;   // number</code></pre>
+
+          <h3>infer for tuples</h3>
+          <pre><code>type Last&lt;T extends any[]&gt; = T extends [...infer _, infer L] ? L : never;
+
+type A = Last&lt;[1, 2, 3]&gt;;       // 3
+type B = Last&lt;[string, number]&gt;; // number
+
+type Head&lt;T extends any[]&gt; = T extends [infer H, ...any[]] ? H : never;
+type Tail&lt;T extends any[]&gt; = T extends [any, ...infer T] ? T : never;</code></pre>
+
+          <div class="note">
+            <p><strong>Remember:</strong> <code>infer</code> can only be used on the right side of <code>extends</code> inside a conditional type. It is not accessible outside the condition.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Write a type MyParameters&lt;T&gt; (analogous to the built-in) that returns a tuple of a function\'s parameter types.',
+          initialCode: `type MyParameters<T> = // Your code
+
+// Check:
+const createUser = (name: string, age: number, admin: boolean) => {};
+
+type Params = MyParameters<typeof createUser>;
+// Expected: [name: string, age: number, admin: boolean]`,
+          solution: `type MyParameters<T> = T extends (...args: infer P) => any ? P : never;`,
+          hint: 'Use infer P in the argument position: T extends (...args: infer P) => any ? P : never',
+        },
+      },
+      {
+        id: 10,
+        title: 'Mapped Types',
+        content: `
+          <h3>What are Mapped Types?</h3>
+          <p>Mapped types create new types by iterating over the keys of an existing type. Syntax: <code>{ [K in keyof T]: ... }</code>.</p>
+
+          <pre><code>type MyReadonly&lt;T&gt; = {
+  readonly [K in keyof T]: T[K];
+};
+
+type MyPartial&lt;T&gt; = {
+  [K in keyof T]?: T[K];
+};
+
+// Remove readonly (-/+ modifiers)
+type Mutable&lt;T&gt; = {
+  -readonly [K in keyof T]: T[K];
+};
+
+type MyRequired&lt;T&gt; = {
+  [K in keyof T]-?: T[K];
+};</code></pre>
+
+          <h3>Key remapping via as</h3>
+          <pre><code>type Getters&lt;T&gt; = {
+  [K in keyof T as \`get\${Capitalize&lt;string & K&gt;}\`]: () => T[K];
+};
+
+interface User {
+  name: string;
+  age: number;
+}
+
+type UserGetters = Getters&lt;User&gt;;
+// { getName: () => string; getAge: () => number }</code></pre>
+
+          <h3>Key filtering via as + never</h3>
+          <pre><code>type PickByValue&lt;T, V&gt; = {
+  [K in keyof T as T[K] extends V ? K : never]: T[K];
+};
+
+interface Form {
+  name: string;
+  age: number;
+  email: string;
+  isAdmin: boolean;
+}
+
+type StringFields = PickByValue&lt;Form, string&gt;;
+// { name: string; email: string }</code></pre>
+
+          <h3>Mapped Types + Template Literal Types</h3>
+          <pre><code>type EventMap&lt;T extends string&gt; = {
+  [K in T as \`on\${Capitalize&lt;K&gt;}\`]: (event: K) => void;
+};
+
+type ButtonEvents = EventMap&lt;'click' | 'focus' | 'blur'&gt;;
+// { onClick: ...; onFocus: ...; onBlur: ... }</code></pre>
+
+          <div class="note">
+            <p><strong>Key rule:</strong> The <code>as</code> modifier comes after <code>in keyof T</code>. If <code>as</code> returns <code>never</code>, the key is excluded from the result.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Write a type Nullable&lt;T&gt; that makes all object fields accept null. Then write OmitNever&lt;T&gt; that removes all fields with type never.',
+          initialCode: `// Make all fields accept null
+type Nullable<T> = // Your code
+
+// Remove fields with type never
+type OmitNever<T> = // Your code
+
+// Check:
+interface User { id: number; name: string; }
+type NullableUser = Nullable<User>;
+// { id: number | null; name: string | null }
+
+type WithNever = { a: string; b: never; c: number };
+type Clean = OmitNever<WithNever>;
+// { a: string; c: number }`,
+          solution: `type Nullable<T> = {
+  [K in keyof T]: T[K] | null;
+};
+
+type OmitNever<T> = {
+  [K in keyof T as T[K] extends never ? never : K]: T[K];
+};`,
+          hint: 'For Nullable, add | null to T[K]. For OmitNever, use as with a condition: if T[K] extends never — return never (key disappears), otherwise K.',
+        },
+      },
+      {
+        id: 11,
+        title: 'Function Overloads',
+        content: `
+          <h3>Why overloads?</h3>
+          <p>Overloads let you describe multiple signatures for a single function — TypeScript picks the right one based on the arguments. This gives precise typing for different call patterns.</p>
+
+          <h3>Overload syntax</h3>
+          <pre><code>// Overload signatures (types only, no implementation)
+function format(value: string): string;
+function format(value: number, decimals: number): string;
+function format(value: Date): string;
+
+// Implementation (not exposed as its own overload)
+function format(value: string | number | Date, decimals?: number): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return value.toFixed(decimals ?? 2);
+  return value.toLocaleDateString('en-US');
+}
+
+format('  hello  ');   // string ✓
+format(3.14159, 2);    // string ✓
+format(new Date());    // string ✓
+// format(true);       // Error ✓</code></pre>
+
+          <h3>Overloads with different return types</h3>
+          <pre><code>function createElement(tag: 'a'): HTMLAnchorElement;
+function createElement(tag: 'canvas'): HTMLCanvasElement;
+function createElement(tag: 'input'): HTMLInputElement;
+function createElement(tag: string): HTMLElement;
+function createElement(tag: string): HTMLElement {
+  return document.createElement(tag);
+}
+
+const link = createElement('a');
+// TypeScript knows link is HTMLAnchorElement
+link.href = 'https://example.com'; // ✓</code></pre>
+
+          <h3>Alternative: conditional types</h3>
+          <pre><code>type ParseResult&lt;T extends string | number&gt; =
+  T extends string ? number : string;
+
+function parse&lt;T extends string | number&gt;(value: T): ParseResult&lt;T&gt; {
+  if (typeof value === 'string') return Number(value) as ParseResult&lt;T&gt;;
+  return String(value) as ParseResult&lt;T&gt;;
+}
+
+const num = parse('42');  // number
+const str = parse(42);    // string</code></pre>
+
+          <div class="note">
+            <p><strong>Rule:</strong> Overload signatures come before the implementation. The implementation must be compatible with all signatures. TypeScript only shows overload signatures in IntelliSense — the implementation is hidden.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Write an overloaded function toArray that: when given a string — returns string[], when given a number — returns number[], when given a boolean — returns boolean[].',
+          initialCode: `// Declare overload signatures and implementation:
+function toArray(value: string): string[];
+// ... remaining signatures
+
+function toArray(value: any): any[] {
+  // Your implementation
+}
+
+// Check:
+const a = toArray('hello'); // string[]
+const b = toArray(42);      // number[]
+const c = toArray(true);    // boolean[]`,
+          solution: `function toArray(value: string): string[];
+function toArray(value: number): number[];
+function toArray(value: boolean): boolean[];
+function toArray(value: string | number | boolean): (string | number | boolean)[] {
+  return [value];
+}`,
+          hint: 'Write three overload signatures, then one implementation with a union-type parameter. The implementation accepts all possible types.',
+        },
+      },
+      {
+        id: 12,
+        title: 'Generics in React Components with TypeScript',
+        content: `
+          <h3>Why generics in components?</h3>
+          <p>Generic components let you build reusable UI that preserves type information about the data it works with.</p>
+
+          <h3>Generic component: basic example</h3>
+          <pre><code>interface ListProps&lt;T&gt; {
+  items: T[];
+  renderItem: (item: T) => React.ReactNode;
+  keyExtractor: (item: T) => string;
+}
+
+function List&lt;T&gt;({ items, renderItem, keyExtractor }: ListProps&lt;T&gt;) {
+  return (
+    &lt;ul&gt;
+      {items.map((item) => (
+        &lt;li key={keyExtractor(item)}&gt;{renderItem(item)}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+// TypeScript infers T automatically:
+&lt;List
+  items={[{ id: 1, name: 'John' }]}
+  keyExtractor={(u) => String(u.id)}
+  renderItem={(u) => &lt;span&gt;{u.name}&lt;/span&gt;}
+/&gt;</code></pre>
+
+          <h3>Generic useLocalStorage hook</h3>
+          <pre><code>function useLocalStorage&lt;T&gt;(key: string, initialValue: T) {
+  const [value, setValue] = React.useState&lt;T&gt;(() => {
+    const stored = localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as T) : initialValue;
+  });
+
+  const set = (newValue: T) => {
+    setValue(newValue);
+    localStorage.setItem(key, JSON.stringify(newValue));
+  };
+
+  return [value, set] as const;
+}
+
+const [user, setUser] = useLocalStorage&lt;User&gt;('user', defaultUser);
+// user: User, setUser: (v: User) => void</code></pre>
+
+          <h3>Generic with constraint</h3>
+          <pre><code>interface WithId {
+  id: number;
+}
+
+function DataTable&lt;T extends WithId&gt;({ rows }: { rows: T[] }) {
+  return (
+    &lt;table&gt;
+      {rows.map((row) => (
+        &lt;tr key={row.id}&gt;
+          {/* TypeScript knows row.id exists */}
+        &lt;/tr&gt;
+      ))}
+    &lt;/table&gt;
+  );
+}</code></pre>
+
+          <div class="note">
+            <p><strong>Syntax in .tsx files:</strong> Write <code>&lt;T,&gt;</code> or <code>&lt;T extends unknown&gt;</code> instead of <code>&lt;T&gt;</code> — otherwise the parser treats angle brackets as JSX tags.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Write a generic hook useFetch&lt;T&gt; that accepts a URL, makes a fetch request and returns { data: T | null, loading: boolean, error: string | null }.',
+          initialCode: `import { useState, useEffect } from 'react';
+
+function useFetch<T>(url: string) {
+  // Your code here
+}
+
+// Check:
+interface Post { id: number; title: string; }
+
+const { data, loading, error } = useFetch<Post>('/api/posts/1');
+// data: Post | null
+// loading: boolean
+// error: string | null`,
+          solution: `import { useState, useEffect } from 'react';
+
+function useFetch<T>(url: string) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+        return res.json() as Promise<T>;
+      })
+      .then((json) => { setData(json); setError(null); })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [url]);
+
+  return { data, loading, error };
+}`,
+          hint: 'Use useState<T | null>(null) for data, useState(true) for loading, useState<string | null>(null) for error. In useEffect, fetch and update state.',
+        },
+      },
+      {
+        id: 13,
+        title: 'Branded Types: Nominal Typing in TypeScript',
+        content: `
+          <h3>The structural typing problem</h3>
+          <p>TypeScript uses structural typing — two types are compatible if their shapes match. This causes issues with semantically different but structurally identical types:</p>
+          <pre><code>type UserId = number;
+type OrderId = number;
+
+const getUserById = (id: UserId) => { /* ... */ };
+const orderId: OrderId = 42;
+
+getUserById(orderId); // TypeScript won't error!
+// But this is semantically wrong</code></pre>
+
+          <h3>Solution: Branded Types</h3>
+          <pre><code>type Brand&lt;T, B&gt; = T & { readonly __brand: B };
+
+type UserId  = Brand&lt;number, 'UserId'&gt;;
+type OrderId = Brand&lt;number, 'OrderId'&gt;;
+
+const UserId  = (id: number): UserId  => id as UserId;
+const OrderId = (id: number): OrderId => id as OrderId;
+
+const getUserById = (id: UserId) => { /* ... */ };
+
+const userId  = UserId(1);
+const orderId = OrderId(42);
+
+getUserById(userId);   // ✓
+getUserById(orderId);  // Error: OrderId ≠ UserId ✓
+getUserById(42);       // Error: number ≠ UserId ✓</code></pre>
+
+          <h3>String Branded Types</h3>
+          <pre><code>type Email = Brand&lt;string, 'Email'&gt;;
+type Url   = Brand&lt;string, 'Url'&gt;;
+
+const toEmail = (value: string): Email => {
+  if (!value.includes('@')) throw new Error('Invalid email');
+  return value as Email;
+};
+
+const sendEmail = (to: Email, subject: string) => { /* ... */ };
+
+sendEmail(toEmail('user@example.com'), 'Subject'); // ✓
+sendEmail('user@example.com', 'Subject');           // Error ✓</code></pre>
+
+          <h3>Validated data with Branded Types</h3>
+          <pre><code>type PositiveNumber = Brand&lt;number, 'PositiveNumber'&gt;;
+type Percentage    = Brand&lt;number, 'Percentage'&gt;;
+
+const toPositive = (n: number): PositiveNumber => {
+  if (n &lt;= 0) throw new Error('Must be positive');
+  return n as PositiveNumber;
+};
+
+const toPercent = (n: number): Percentage => {
+  if (n &lt; 0 || n &gt; 100) throw new Error('0–100');
+  return n as Percentage;
+};
+
+const applyDiscount = (price: PositiveNumber, discount: Percentage): number =>
+  price * (1 - discount / 100);
+
+applyDiscount(toPositive(1000), toPercent(20)); // ✓
+applyDiscount(1000, 20); // Error: number ≠ PositiveNumber ✓</code></pre>
+
+          <div class="note">
+            <p><strong>Convention:</strong> Branded values must only be created through validating constructors — never via raw <code>as</code> in business code. That is the essence of nominal typing: only "blessed" values are trusted.</p>
+          </div>
+        `,
+        practice: {
+          task: 'Create Branded types Celsius and Fahrenheit for temperature. Write a conversion function toCelsius(f: Fahrenheit): Celsius. Ensure TypeScript prevents mixing up the units.',
+          initialCode: `type Brand<T, B> = T & { readonly __brand: B };
+
+// Create types:
+type Celsius = // ...
+type Fahrenheit = // ...
+
+// Constructors:
+const Celsius = (value: number): Celsius => // ...
+const Fahrenheit = (value: number): Fahrenheit => // ...
+
+// Conversion:
+const toCelsius = (f: Fahrenheit): Celsius => // ...
+
+// Check:
+const bodyTemp = Fahrenheit(98.6);
+const inCelsius = toCelsius(bodyTemp); // ✓
+// toCelsius(36.6);        // Should error
+// toCelsius(Celsius(37)); // Should error`,
+          solution: `type Brand<T, B> = T & { readonly __brand: B };
+
+type Celsius = Brand<number, 'Celsius'>;
+type Fahrenheit = Brand<number, 'Fahrenheit'>;
+
+const Celsius = (value: number): Celsius => value as Celsius;
+const Fahrenheit = (value: number): Fahrenheit => value as Fahrenheit;
+
+const toCelsius = (f: Fahrenheit): Celsius =>
+  Celsius((f - 32) * 5 / 9);`,
+          hint: 'Use type Brand<T, B> = T & { readonly __brand: B }. Constructors cast a number to the branded type via as. toCelsius takes only Fahrenheit and returns Celsius.',
+        },
+      },
+    ],
+  },
 ];
 
 module.exports = chaptersData;
